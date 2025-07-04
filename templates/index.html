@@ -265,6 +265,7 @@
         .entity-GPE { background-color: var(--entity-gpe-org); color: #fdfdfd; }
         .entity-ORG { background-color: var(--entity-gpe-org); color: #fdfdfd; }
         .entity-LOC { background-color: var(--entity-loc); color: #fdfdfd; }
+        .entity-NORP { background-color: var(--entity-time); color: #fdfdfd; }
 
         .json-output {
             background: #f8f9fa;
@@ -404,10 +405,14 @@
                         <div class="legend-color" style="background: linear-gradient(135deg, #fd79a8, #e84393);"></div>
                         <span>地名 (GPE)</span>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: linear-gradient(135deg, #fd79a8, #e84393);"></div>
-                        <span>機構 (ORG)</span>
-                    </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #fd79a8, #e84393);"></div>
+                    <span>機構 (ORG)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #a8e6cf, #7fcdcd);"></div>
+                    <span>國籍/宗教/政治團體 (NORP)</span>
+                </div>
                 </div>
 
                 <div id="markedText" class="marked-text"></div>
@@ -574,7 +579,8 @@
                 'PERSON': '人名',
                 'GPE': '地名',
                 'ORG': '機構',
-                'LOC': '位置'
+                'LOC': '位置',
+                'NORP': '國籍/宗教/政治團體'
             };
             
             const statsHtml = Object.entries(entityCounts)
