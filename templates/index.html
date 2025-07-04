@@ -266,6 +266,7 @@
         .entity-ORG { background-color: var(--entity-gpe-org); color: #fdfdfd; }
         .entity-LOC { background-color: var(--entity-loc); color: #fdfdfd; }
         .entity-NORP { background-color: var(--entity-time); color: #fdfdfd; }
+        .entity-FAC { background-color: var(--entity-date); color: #fdfdfd; }
 
         .json-output {
             background: #f8f9fa;
@@ -412,6 +413,10 @@
                 <div class="legend-item">
                     <div class="legend-color" style="background: linear-gradient(135deg, #a8e6cf, #7fcdcd);"></div>
                     <span>國籍/宗教/政治團體 (NORP)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #74b9ff, #0984e3);"></div>
+                    <span>設施 (FAC)</span>
                 </div>
                 </div>
 
@@ -580,7 +585,8 @@
                 'GPE': '地名',
                 'ORG': '機構',
                 'LOC': '位置',
-                'NORP': '國籍/宗教/政治團體'
+                'NORP': '國籍/宗教/政治團體',
+                'FAC': '設施'
             };
             
             const statsHtml = Object.entries(entityCounts)

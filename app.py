@@ -26,6 +26,16 @@ async def process_ner(request: Request):
 
 @app.get("/test_ner")
 async def test_ner():
-    test_text = "我來自台灣，是一個民主國家。"
-    converted_results = process_text(test_text, ner_pipeline)
-    return {"results": converted_results}
+    # Use multiple diverse sample texts to cover various entity types
+    sample_texts = [
+        "我來自台灣，是一個民主國家。",
+        "李小明在2023年12月25日上午10點前往台北101大樓。",
+        "美國總統拜登與中國領導人習近平會面，討論國際關係。",
+        "基督教和伊斯蘭教是世界主要宗教。"
+    ]
+    all_results = []
+    for text in sample_texts:
+        results = process_text(text, ner_pipeline)
+        all_results.extend(results)
+    entity_types = list(set(result["entity_group"] for result in all_results))
+    return {"results": all_results, "entity_types": entity_types}
