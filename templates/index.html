@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chinese Named Entity Recognition</title>
+    <style>
+        :root {
+            /* 整體底色 */
+            --bg-color:        #FFFFFF; /* 白色 */
+            --container-bg:    #FFFFFF; /* 白色 */    
+
+            /* 主次視覺色 */
+            --primary-accent:  #4285F4; /* Google 藍 */
+            
+            /* 文字、邊框、陰影 */
+            --text-color:      #202124; /* Google 深灰 */
+            --border-color:    #DADCE0; /* Google 淺灰 */
+            --shadow-color:    rgba(0, 0, 0, 0.1); /* Google 輕微陰影 */
+
+            /* 實體顏色 */
+            --entity-date:     #4285F4; /* Google 藍 */
+            --entity-time:     #0F9D58; /* Google 綠 */
+            --entity-person:   #DB4437; /* Google 紅 */
+            --entity-gpe-org:  #F4B400; /* Google 黃 */
+            --entity-loc:      #DADCE0; /* Google 淺灰 */
+        }
+
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--container-bg);
+            border-radius: 15px;
+            box-shadow: 0 8px 25px var(--shadow-color);
+            overflow: hidden;
+            border: 1px solid #e9e6e0;
+        }
+
+        .header {
+            background-color: var(--primary-accent);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--primary-accent);
+            font-size: 1.1em;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            resize: vertical;
+            min-height: 120px;
+            line-height: 1.6;
+            background-color: #f9f9f9;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 0 3px rgba(44, 93, 99, 0.15);
+        }
+
+        .analyze-btn {
+            background-color: var(--primary-accent);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(44, 93, 99, 0.3);
+        }
+
+        .analyze-btn:active {
+            transform: translateY(0);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .results-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .entity-stats {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .marked-text {
+            background: #faf8f2;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e9e6e0;
+            margin-bottom: 20px;
+            line-height: 2;
+            font-size: 1.1em;
+        }
+
+        .entity {
+            position: relative;
+            display: inline-block;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0 2px;
+            border-bottom: 2px solid rgba(0,0,0,0.1);
+        }
+
+        .entity:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .entity-tooltip {
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            font-weight: normal;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s ease, bottom 0.3s ease;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .entity:hover .entity-tooltip {
+            opacity: 1;
+            bottom: 135%;
+        }
+
+        .entity-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.85);
+        }
+
+        /* Entity type colors */
+        .entity-DATE { background-color: var(--entity-date); color: var(--text-color); }
+        .entity-TIME { background-color: var(--entity-time); color: var(--text-color); }
+        .entity-PERSON { background-color: var(--entity-person); color: #fdfdfd; }
+        .entity-GPE { background-color: var(--entity-gpe-org); color: #fdfdfd; }
+        .entity-ORG { background-color: var(--entity-gpe-org); color: #fdfdfd; }
+        .entity-LOC { background-color: var(--entity-loc); color: #fdfdfd; }
+        .entity-NORP { background-color: var(--entity-time); color: #fdfdfd; }
+        .entity-FAC { background-color: var(--entity-date); color: #fdfdfd; }
+
+        .json-output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .json-toggle {
+            background: none;
+            border: none;
+            color: var(--primary-accent);
+            cursor: pointer;
+            font-weight: 600;
+            padding: 5px 0;
+            text-decoration: none;
+            border-bottom: 1px dotted var(--primary-accent);
+        }
+
+        .json-content {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .json-content pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .entity-stats {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>中文命名實體識別</h1>
+            <p>Chinese Named Entity Recognition - 智能文本分析工具</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="input-section">
+                <div class="input-group">
+                    <label class="input-label" for="textInput">輸入要分析的中文文本：</label>
+                    <textarea 
+                        id="textInput" 
+                        class="text-input" 
+                        placeholder="例如：今天天氣很好，李小明和王小華去台北101大樓參觀，他們在2023年12月25日上午10點到達。"
+                        rows="4"
+                    ></textarea>
+                </div>
+                <button id="analyzeBtn" class="analyze-btn">
+                    <span class="btn-text">開始分析</span>
+                    <div class="loading"></div>
+                </button>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+
+            <div id="resultsSection" class="results-section">
+                <div class="results-header">
+                    <h2 class="results-title">分析結果</h2>
+                    <div id="entityStats" class="entity-stats"></div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #ffeaa7, #fdcb6e);"></div>
+                        <span>日期 (DATE)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #a8e6cf, #7fcdcd);"></div>
+                        <span>時間 (TIME)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #74b9ff, #0984e3);"></div>
+                        <span>人名 (PERSON)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: linear-gradient(135deg, #fd79a8, #e84393);"></div>
+                        <span>地名 (GPE)</span>
+                    </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #fd79a8, #e84393);"></div>
+                    <span>機構 (ORG)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #a8e6cf, #7fcdcd);"></div>
+                    <span>國籍/宗教/政治團體 (NORP)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #74b9ff, #0984e3);"></div>
+                    <span>設施 (FAC)</span>
+                </div>
+                </div>
+
+                <div id="markedText" class="marked-text"></div>
+
+                <div class="json-output">
+                    <button class="json-toggle" onclick="toggleJson()">
+                        <span id="jsonToggleText">顯示 JSON 結果</span>
+                    </button>
+                    <div id="jsonContent" class="json-content">
+                        <pre id="jsonResults"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentResults = [];
+        let isJsonVisible = false;
+
+        // Sample data for demonstration
+        const sampleResults = [
+            {
+                "entity_group": "DATE",
+                "score": 0.9999992847442627,
+                "word": "今天",
+                "start": 0,
+                "end": 2
+            },
+            {
+                "entity_group": "PERSON",
+                "score": 0.9999995231628418,
+                "word": "李小明",
+                "start": 7,
+                "end": 10
+            },
+            {
+                "entity_group": "PERSON",
+                "score": 0.9999994039535522,
+                "word": "王小華",
+                "start": 11,
+                "end": 14
+            },
+            {
+                "entity_group": "GPE",
+                "score": 0.9999991655349731,
+                "word": "台北",
+                "start": 15,
+                "end": 17
+            },
+            {
+                "entity_group": "DATE",
+                "score": 0.9999990463256836,
+                "word": "2023年12月25日",
+                "start": 25,
+                "end": 35
+            },
+            {
+                "entity_group": "TIME",
+                "score": 0.9999988079071045,
+                "word": "上午10點",
+                "start": 35,
+                "end": 40
+            }
+        ];
+
+        const sampleText = "今天天氣很好，李小明和王小華去台北101大樓參觀，他們在2023年12月25日上午10點到達。";
+
+        // Set sample text on page load
+        document.getElementById('textInput').value = sampleText;
+
+        document.getElementById('analyzeBtn').addEventListener('click', async function() {
+            const textInput = document.getElementById('textInput');
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                showError('請輸入要分析的文本');
+                return;
+            }
+
+            setLoading(true);
+            hideError();
+            
+            try {
+                const response = await fetch('/ner', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                currentResults = data.results;
+                
+                displayResults(text, data.results);
+                
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                showError('分析過程中發生錯誤，請稍後重試');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function setLoading(loading) {
+            const btn = document.getElementById('analyzeBtn');
+            const btnText = btn.querySelector('.btn-text');
+            const loadingEl = btn.querySelector('.loading');
+            
+            if (loading) {
+                btn.disabled = true;
+                btnText.style.opacity = '0';
+                loadingEl.style.display = 'block';
+            } else {
+                btn.disabled = false;
+                btnText.style.opacity = '1';
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function displayResults(originalText, results) {
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // Display entity statistics
+            displayEntityStats(results);
+            
+            // Display marked text
+            displayMarkedText(originalText, results);
+            
+            // Display JSON results
+            displayJsonResults(results);
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayEntityStats(results) {
+            const statsEl = document.getElementById('entityStats');
+            const entityCounts = {};
+            
+            results.forEach(entity => {
+                entityCounts[entity.entity_group] = (entityCounts[entity.entity_group] || 0) + 1;
+            });
+            
+            const entityNames = {
+                'DATE': '日期',
+                'TIME': '時間',
+                'PERSON': '人名',
+                'GPE': '地名',
+                'ORG': '機構',
+                'LOC': '位置',
+                'NORP': '國籍/宗教/政治團體',
+                'FAC': '設施'
+            };
+            
+            const statsHtml = Object.entries(entityCounts)
+                .map(([type, count]) => `<div class="stat-item">${entityNames[type] || type}: ${count}</div>`)
+                .join('');
+            
+            statsEl.innerHTML = statsHtml;
+        }
+
+        function displayMarkedText(originalText, results) {
+            const markedEl = document.getElementById('markedText');
+            
+            // Sort entities by start position
+            const sortedResults = results.sort((a, b) => a.start - b.start);
+            
+            let markedText = '';
+            let lastEnd = 0;
+            
+            sortedResults.forEach(entity => {
+                // Add text before entity
+                markedText += originalText.slice(lastEnd, entity.start);
+                
+                // Add marked entity
+                const confidence = Math.round(entity.score * 100);
+                markedText += `<span class="entity entity-${entity.entity_group}">
+                    ${entity.word}
+                    <div class="entity-tooltip">${entity.entity_group} (${confidence}%)</div>
+                </span>`;
+                
+                lastEnd = entity.end;
+            });
+            
+            // Add remaining text
+            markedText += originalText.slice(lastEnd);
+            
+            markedEl.innerHTML = markedText;
+        }
+
+        function displayJsonResults(results) {
+            const jsonEl = document.getElementById('jsonResults');
+            jsonEl.textContent = JSON.stringify(results, null, 2);
+        }
+
+        function toggleJson() {
+            const jsonContent = document.getElementById('jsonContent');
+            const toggleText = document.getElementById('jsonToggleText');
+            
+            isJsonVisible = !isJsonVisible;
+            
+            if (isJsonVisible) {
+                jsonContent.style.display = 'block';
+                toggleText.textContent = '隱藏 JSON 結果';
+            } else {
+                jsonContent.style.display = 'none';
+                toggleText.textContent = '顯示 JSON 結果';
+            }
+        }
+
+        // Auto-analyze sample text on page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('analyzeBtn').click();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
