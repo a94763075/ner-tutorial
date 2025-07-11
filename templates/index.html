@@ -375,6 +375,13 @@
                         rows="4"
                     ></textarea>
                 </div>
+                <div class="input-group">
+                    <label class="input-label" for="modelSelect">選擇模型：</label>
+                    <select id="modelSelect" class="text-input" style="min-height: 50px;">
+                        <option value="default">預設模型</option>
+                        <option value="trained">新訓練模型</option>
+                    </select>
+                </div>
                 <button id="analyzeBtn" class="analyze-btn">
                     <span class="btn-text">開始分析</span>
                     <div class="loading"></div>
@@ -502,12 +509,14 @@
             hideError();
             
             try {
+                const modelSelect = document.getElementById('modelSelect');
+                const selectedModel = modelSelect.value;
                 const response = await fetch('/ner', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ text: text }),
+                    body: JSON.stringify({ text: text, model: selectedModel }),
                 });
                 
                 if (!response.ok) {
